@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Bảng 1: Lưu thông tin người dùng
+model User {
+  id        Int             @id @default(autoincrement())
+  username  String          @unique
+  password  String          
+  role      String          @default("USER") 
+  sessions  DeviceSession[] // Báo cho hệ thống biết 1 User có thể có nhiều Session
+}
+
+// Bảng 2: Lưu thông tin thiết bị
+model DeviceSession {
+  id          Int      @id @default(autoincrement())
+  userId      Int      // ID của người dùng thực hiện đăng nhập
+  ip_address  String   // Địa chỉ IP lúc đăng nhập
+  user_agent  String   // Trình duyệt
+  login_time  DateTime @default(now()) // Thời gian bắt đầu đăng nhập
+  isValid     Boolean  @default(true) // Trạng thái: còn hiệu lực (true) hay đã bị khóa (false) do vi phạm
+  
+  // Liên kết bảng này với bảng User ở trên
+  user        User     @relation(fields: [userId], references: [id])
+}
