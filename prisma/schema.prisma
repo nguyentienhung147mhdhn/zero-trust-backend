@@ -14,6 +14,7 @@ model User {
   password  String          
   role      String          @default("USER") 
   sessions  DeviceSession[] // Báo cho hệ thống biết 1 User có thể có nhiều Session
+  mfa_secret  String?
 }
 
 // Bảng 2: Lưu thông tin thiết bị
