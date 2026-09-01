@@ -6,6 +6,20 @@ const jwt = require("jsonwebtoken");
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 
+const rateLimit = require("express-rate-limit");
+
+// Cấu hình khóa IP nếu spam quá 5 lần trong 15 phút
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // Khung thời gian: 15 phút
+  max: 5, // Tối đa 5 request từ cùng 1 IP
+  message: {
+    message:
+      "Phát hiện spam request! IP của bạn đã bị khóa tạm thời. Vui lòng thử lại sau 15 phút.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const prisma = new PrismaClient();
 const app = express();
 
@@ -15,7 +29,7 @@ app.use(express.json());
 // ==========================================
 // API ĐĂNG NHẬP (Xác thực 2 bước & Cấp JWT)
 // ==========================================
-app.post("/login", async (req, res) => {
+app.post("/login", loginLimiter, async (req, res) => {
   try {
     // 1. Nhận thông tin gửi lên (Yêu cầu thêm mfaCode)
     const { username, password, mfaCode } = req.body;
