@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
@@ -73,9 +74,9 @@ app.post("/login", loginLimiter, async (req, res) => {
 
     // 5. CẤP THẺ THÔNG HÀNH (Sau khi qua đủ 2 ải)
     const token = jwt.sign(
-      { userId: user.id, role: user.role },
-      process.env.JWT_SECRET || "CHIA_KHOA_BIMAT_CUA_NHOM",
-      { expiresIn: "15m" }, // Rút ngắn xuống 15 phút cho đúng chuẩn Zero Trust
+      { username: user.username },
+      process.env.JWT_SECRET, // Đọc khóa từ file .env
+      { expiresIn: "1h" },
     );
 
     res.json({
