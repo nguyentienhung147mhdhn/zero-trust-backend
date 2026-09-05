@@ -4,19 +4,49 @@ const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
 
 async function main() {
-  // Mã hóa mật khẩu '123456' trước khi lưu
+  console.log("Bắt đầu thêm dữ liệu mẫu vào Database...");
   const hashedPassword = await bcrypt.hash("123456", 10);
 
-  // Tạo tài khoản mẫu
-  const user = await prisma.user.create({
-    data: {
-      username: "admin_hung",
+  // 1. Tài khoản Admin
+  const admin = await prisma.user.upsert({
+    where: { username: "admin_Viet" },
+    update: {},
+    create: {
+      username: "admin_Viet",
       password: hashedPassword,
-      role: "ADMIN", // Phân quyền là ADMIN
+      role: "ADMIN",
+      is_mfa_active: false,
     },
   });
 
-  console.log("Đã tạo thành công tài khoản:", user.username);
+  // 2. Tài khoản User bình thường
+  const user = await prisma.user.upsert({
+    where: { username: "user_normal" },
+    update: {},
+    create: {
+      username: "user_normal",
+      password: hashedPassword,
+      role: "USER",
+      is_mfa_active: false,
+    },
+  });
+
+  // 3. Tài khoản Hacker (Dùng test Brute-force & Thuật toán Trust)
+  const hacker = await prisma.user.upsert({
+    where: { username: "hacker_test" },
+    update: {},
+    create: {
+      username: "hacker_test",
+      password: hashedPassword,
+      role: "HACKER",
+      is_mfa_active: false,
+    },
+  });
+
+  console.log("Đã tạo 3 tài khoản thành công");
+  console.log(`- ${admin.username} | Role: ${admin.role}`);
+  console.log(`- ${user.username} | Role: ${user.role}`);
+  console.log(`- ${hacker.username} | Role: ${hacker.role}`);
 }
 
 main()
