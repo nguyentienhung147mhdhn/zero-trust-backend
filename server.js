@@ -9,6 +9,8 @@ const QRCode = require("qrcode");
 
 const rateLimit = require("express-rate-limit");
 
+const { requireAuth } = require("./middleware");
+
 // Cấu hình khóa IP nếu spam quá 5 lần trong 15 phút
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // Khung thời gian: 15 phút
@@ -151,6 +153,18 @@ app.post("/mfa/verify", async (req, res) => {
 // KHỞI ĐỘNG SERVER
 // ==========================================
 const PORT = 3000;
+
+// ==========================================
+// API DASHBOARD (Vùng bảo mật Zero Trust)
+// ==========================================
+app.get("/api/dashboard", requireAuth, (req, res) => {
+  res.json({
+    message:
+      "Thành công! Chào mừng bạn đến với vùng dữ liệu bảo mật Zero Trust.",
+    user: req.user, // Hiển thị thông tin user được giải mã từ Token
+  });
+});
+
 app.listen(PORT, () => {
   console.log(
     `🚀 Server Backend Zero Trust đang chạy tại http://localhost:${PORT}`,
