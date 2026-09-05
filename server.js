@@ -72,6 +72,18 @@ app.post("/login", loginLimiter, async (req, res) => {
       }
     }
 
+    let rawIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+    let clientIp = rawIp ? rawIp.split(",")[0].trim() : "Unknown";
+
+    if (clientIp === "::1") {
+      clientIp = "127.0.0.1";
+    }
+
+    await prisma.user.update({
+      where: { username: user.username },
+      data: { last_login_ip: clientIp },
+    });
+
     // 5. CẤP THẺ THÔNG HÀNH (Sau khi qua đủ 2 ải)
     const token = jwt.sign(
       { username: user.username },
