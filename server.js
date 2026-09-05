@@ -1,4 +1,5 @@
 require("dotenv").config();
+const { requireAuth } = require('./middleware');
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
@@ -15,7 +16,7 @@ const loginLimiter = rateLimit({
   max: 5, // Tối đa 5 request từ cùng 1 IP
   message: {
     message:
-      "Phát hiện spam request! IP của bạn đã bị khóa tạm thời. Vui lòng thử lại sau 15 phút.",
+      "Phát hiện spam request! IP của bạn đã bị khóa tạm thời. Vui lòng thử lại sau 15 phút",
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -27,9 +28,8 @@ const app = express();
 // Middleware: Cho phép Express đọc dữ liệu người dùng gửi lên dưới dạng JSON
 app.use(express.json());
 
-// ==========================================
 // API ĐĂNG NHẬP (Xác thực 2 bước & Cấp JWT)
-// ==========================================
+
 app.post("/login", loginLimiter, async (req, res) => {
   try {
     // 1. Nhận thông tin gửi lên (Yêu cầu thêm mfaCode)
@@ -41,13 +41,13 @@ app.post("/login", loginLimiter, async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json({ message: "Tài khoản không tồn tại!" });
+      return res.status(401).json({ message: "Tài khoản không tồn tại" });
     }
 
     // 3. XÁC THỰC BƯỚC 1: KIỂM TRA MẬT KHẨU
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Sai mật khẩu!" });
+      return res.status(401).json({ message: "Sai mật khẩu" });
     }
 
     // 4. XÁC THỰC BƯỚC 2: KIỂM TRA MÃ MFA (6 số)
@@ -55,7 +55,7 @@ app.post("/login", loginLimiter, async (req, res) => {
       if (!mfaCode) {
         return res
           .status(400)
-          .json({ message: "Vui lòng nhập mã bảo mật MFA (6 số)!" });
+          .json({ message: "Vui lòng nhập mã bảo mật MFA (6 số)" });
       }
 
       const isMfaValid = speakeasy.totp.verify({
@@ -68,21 +68,28 @@ app.post("/login", loginLimiter, async (req, res) => {
       if (!isMfaValid) {
         return res
           .status(401)
-          .json({ message: "Mã MFA không chính xác hoặc đã hết hạn!" });
+          .json({ message: "Mã MFA không chính xác hoặc đã hết hạn" });
       }
     }
 
     // 5. CẤP THẺ THÔNG HÀNH (Sau khi qua đủ 2 ải)
+    // Lấy IP của client tại thời điểm bấm đăng nhập
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const token = jwt.sign(
-      { username: user.username },
+      { 
+        username: user.username, 
+        role: user.role,
+        loginIp: clientIp //Đóng dấu chết IP này vào trong Token
+      },
       process.env.JWT_SECRET, // Đọc khóa từ file .env
-      { expiresIn: "1h" },
+      { expiresIn: "15m" },
     );
 
     res.json({
-      message: "Đăng nhập 2 bước thành công!",
+      message: "Đăng nhập 2 bước thành công",
       token: token,
       role: user.role,
+      ip: clientIp //Trả về luôn ip
     });
   } catch (error) {
     console.error(error);
@@ -90,9 +97,7 @@ app.post("/login", loginLimiter, async (req, res) => {
   }
 });
 
-// ==========================================
 // API TẠO MÃ QR MFA (Bảo mật 2 lớp) - Đã cập nhật lưu DB
-// ==========================================
 app.post("/mfa/setup", async (req, res) => {
   const { username } = req.body;
   const secret = speakeasy.generateSecret({ name: "Zero Trust" });
@@ -109,13 +114,13 @@ app.post("/mfa/setup", async (req, res) => {
     res.json({ secret: secret.base32, qrCodeImage: data_url });
   });
 });
-
+// API XÁC THỰC MFA LẦN ĐẦU
 app.post("/mfa/verify", async (req, res) => {
   const { username, mfaCode } = req.body;
 
   const user = await prisma.user.findUnique({ where: { username: username } });
   if (!user || !user.mfa_secret) {
-    return res.status(400).json({ message: "Chưa cài đặt MFA!" });
+    return res.status(400).json({ message: "Chưa cài đặt MFA" });
   }
 
   const verified = speakeasy.totp.verify({
@@ -134,13 +139,15 @@ app.post("/mfa/verify", async (req, res) => {
     res.status(400).json({ message: "Mã xác thực không đúng!" });
   }
 });
+// API được bảo vệ bởi kiến trúc Zero Trust
+app.get("/api/dashboard", requireAuth, (req, res) => {
+  res.json({ message: "Đây là vùng dữ liệu bảo mật" });
+});
 
-// ==========================================
 // KHỞI ĐỘNG SERVER
-// ==========================================
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(
-    `🚀 Server Backend Zero Trust đang chạy tại http://localhost:${PORT}`,
+    ` Server Backend Zero Trust đang chạy tại http://localhost:${PORT}`,
   );
 });
