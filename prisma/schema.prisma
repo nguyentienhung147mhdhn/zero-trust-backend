@@ -16,6 +16,7 @@ model User {
   sessions  DeviceSession[] // Báo cho hệ thống biết 1 User có thể có nhiều Session
   mfa_secret  String?
   is_mfa_active Boolean @default(false)
+  last_login_ip String?
 }
 
 // Bảng 2: Lưu thông tin thiết bị
