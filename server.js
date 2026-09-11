@@ -81,12 +81,25 @@ app.post("/login", loginLimiter, async (req, res) => {
       clientIp = "127.0.0.1";
     }
 
+    // ==========================================
+    // 4.5 XÁC THỰC BƯỚC 3 (ZERO TRUST): KIỂM TRA VỊ TRÍ IP
+    // ==========================================
+    if (user.last_login_ip && user.last_login_ip !== clientIp) {
+      return res.status(403).json({
+        message:
+          "Cảnh báo bảo mật Zero Trust: Phát hiện đăng nhập từ IP lạ (" +
+          clientIp +
+          ")! Truy cập bị từ chối.",
+      });
+    }
+
+    // Cập nhật lại IP vào Database (dành cho trường hợp login lần đầu hoặc IP hợp lệ)
     await prisma.user.update({
       where: { username: user.username },
       data: { last_login_ip: clientIp },
     });
 
-    // 5. CẤP THẺ THÔNG HÀNH (Sau khi qua đủ 2 ải)
+    // 5. CẤP THẺ THÔNG HÀNH (Sau khi qua đủ 3 ải)
     const token = jwt.sign(
       { username: user.username },
       process.env.JWT_SECRET, // Đọc khóa từ file .env
