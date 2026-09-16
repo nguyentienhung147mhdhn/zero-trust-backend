@@ -115,10 +115,20 @@ app.post("/login", loginLimiter, async (req, res) => {
       where: { username: user.username },
       data: { last_login_ip: clientIp },
     });
-
+    const userAgent = req.headers["user-agent"] || "Unknown Device";
+    await prisma.deviceSession.create({
+      data: {
+        userId: user.id,
+        ip_address: clientIp,
+        user_agent: userAgent,
+      }
+    });
     // 5. CẤP THẺ THÔNG HÀNH
     const token = jwt.sign(
-      { username: user.username },
+      { username: user.username,
+      loginIp: clientIp,
+      role: user.role},
+
       process.env.JWT_SECRET,
       { expiresIn: "1h" },
     );
