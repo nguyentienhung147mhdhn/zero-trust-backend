@@ -130,7 +130,7 @@ app.post("/login", loginLimiter, async (req, res) => {
       role: user.role},
 
       process.env.JWT_SECRET,
-      { expiresIn: "1h" },
+      { expiresIn: "15m" },
     );
 
     res.json({
@@ -148,7 +148,7 @@ app.get("/generate-mfa", async (req, res) => {
   try {
     // 1. Tạo một secret key ngẫu nhiên
     const secret = speakeasy.generateSecret({
-      name: "ZTA_Demo_Hung", // Tên sẽ hiển thị trên app Google Authenticator
+      name: "ZTA_Test", // Tên sẽ hiển thị trên app Google Authenticator
     });
 
     // 2. Biến nó thành hình ảnh QR Code
@@ -206,7 +206,7 @@ app.post("/mfa/setup", async (req, res) => {
       where: { username: username },
       data: {
         mfa_secret: secret.base32,
-        is_mfa_active: true, // Phải để true thì API /login mới cho qua
+        is_mfa_active: false,
       },
     });
 
@@ -276,20 +276,36 @@ app.listen(PORT, () => {
   );
 });
 
-app.get("/reset-demo", async (req, res) => {
+app.post("/reset-user-mfa", requireAuth, async (req, res) => {
   try {
+    // 1. Chặn cửa: Chỉ Admin mới có quyền thực hiện
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ 
+        message: "Truy cập bị từ chối! Chỉ Admin mới có quyền thao tác." 
+      });
+    }
+
+    // 2. Nhận tên tài khoản cần reset từ yêu cầu gửi lên
+    const { targetUsername } = req.body;
+    
+    if (!targetUsername) {
+      return res.status(400).json({ message: "Vui lòng cung cấp username cần reset MFA!" });
+    }
+
+    // 3. Tiến hành dọn dẹp MFA cho tài khoản mục tiêu
     await prisma.user.update({
-      where: { username: "admin_hung" },
+      where: { username: targetUsername }, 
       data: {
         is_mfa_active: false,
         mfa_secret: null,
-        last_login_ip: null,
+        // Có thể reset luôn cả IP để họ đăng nhập lại từ đầu
+        last_login_ip: null, 
       },
     });
-    res.send(
-      "Đã dọn dẹp Database! Tài khoản admin_hung đã sẵn sàng để trình diễn quét QR.",
-    );
+
+    res.json({ message: `Đã reset cấu hình MFA thành công cho tài khoản: ${targetUsername}` });
   } catch (error) {
-    res.status(500).send("Lỗi reset");
+    // Nếu truyền sai username không có trong DB, Prisma sẽ văng lỗi vào đây
+    res.status(500).json({ message: "Lỗi! Không tìm thấy tài khoản hoặc hệ thống trục trặc." });
   }
 });
